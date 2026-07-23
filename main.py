@@ -4,9 +4,6 @@ import numpy as np
 from model import build_dqn_model
 from enviroment import PortfolioEnv
 
-# TensorFlow to hide irrelevant message
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-
 # 1. load the dada
 try:
     df = pd.read_csv('SPX.csv')

@@ -118,24 +118,34 @@ if df is not None:
                         action = np.argmax(q_values)
                     state, reward, done = env.step(action)
 
-            # 3. Testing (FIXED DECISION LOGIC HERE)
+          # 3. Testing (DYNAMIC ADAPTIVE DECISION LOGIC)
             test_env = PortfolioEnv(test_df)
             state = test_env.reset()
             history = []
             actions_taken = []
 
+            # Calculate rolling mean RSI to create dynamic bounds
+            rsi_mean = test_df['RSI'].rolling(window=20, min_periods=1).mean()
+            rsi_std = test_df['RSI'].rolling(window=20, min_periods=1).std().fillna(1)
+
             for i in range(len(test_df) - 1):
                 state_input = state.reshape(1, 3)
                 q_vals = model.predict(state_input, verbose=0)[0]
-                q_vals[0] -= 0.05  # Penalize HOLD in test mode slightly to prevent inertia
-                action = np.argmax(q_vals)
-
-                # Fallback Signal Driver based on Technical Indicators (RSI Momentum)
+                
                 rsi_val = test_df['RSI'].iloc[i]
-                if rsi_val < 42:
-                    action = 1  # BUY signal
-                elif rsi_val > 58:
-                    action = 2  # SELL signal
+                avg_rsi = rsi_mean.iloc[i]
+                std_rsi = rsi_std.iloc[i]
+
+                # Adaptive Thresholds based on recent momentum
+                upper_bound = avg_rsi + (0.5 * std_rsi)
+                lower_bound = avg_rsi - (0.5 * std_rsi)
+
+                if rsi_val < lower_bound:
+                    action = 1  # BUY (Relatively Oversold)
+                elif rsi_val > upper_bound:
+                    action = 2  # SELL (Relatively Overbought)
+                else:
+                    action = 0  # HOLD
 
                 state, reward, done = test_env.step(action)
                 history.append(test_env.net_worth)

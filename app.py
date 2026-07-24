@@ -16,7 +16,7 @@ st.markdown("""
         position: fixed;
         bottom: 20px;
         right: 20px;
-        z-index: 1000;
+        z-index: 999999;
     }
     button[data-testid="stBaseButton-secondary"] {
         background-color: #1E90FF !important;

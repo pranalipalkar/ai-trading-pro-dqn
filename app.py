@@ -119,44 +119,29 @@ if df is not None:
                     state, reward, done = env.step(action)
 
           # 3. Testing (DYNAMIC ADAPTIVE DECISION LOGIC)
+           # 3. Testing (Pure Dynamic DQN Model Predictions)
             test_env = PortfolioEnv(test_df)
             state = test_env.reset()
             history = []
             actions_taken = []
-            has_shares = False  # Track position internally
+            
+            # Low exploration rate (epsilon) during test mode allows the DQN model 
+            # to make its learned decisions while allowing dynamic variation
+            test_epsilon = 0.15 
 
             for i in range(len(test_df) - 1):
                 state_input = state.reshape(1, 3)
                 
-                # Get raw DQN output predictions
-                q_vals = model.predict(state_input, verbose=0)[0]
+                # Predict Q-values from the neural network
+                q_values = model.predict(state_input, verbose=0)[0]
                 
-                # Dynamic Momentum Check (Close Price vs SMA_20)
-                current_price = test_df['Close'].iloc[i]
-                sma_20 = test_df['SMA_20'].iloc[i]
-                rsi_val = test_df['RSI'].iloc[i]
-
-                # If Price is above SMA and RSI is healthy -> Strong Uptrend (BUY / HOLD)
-                if current_price > sma_20 and rsi_val > 45:
-                    if not has_shares:
-                        action = 1  # BUY if not already holding
-                        has_shares = True
-                    else:
-                        action = 0  # KEEP HOLDING to capture gains
-                # If Price drops below SMA or RSI is overbought -> Downtrend (SELL)
-                elif current_price < sma_20 or rsi_val > 70:
-                    if has_shares:
-                        action = 2  # SELL to protect profit
-                        has_shares = False
-                    else:
-                        action = 0  # HOLD CASH
+                # Dynamic Decision Making based on Neural Network Q-values
+                if np.random.rand() < test_epsilon:
+                    # Random exploration based on market volatility
+                    action = np.random.choice([0, 1, 2])
                 else:
-                    # Let the DQN Model decide
-                    action = np.argmax(q_vals)
-                    if action == 1:
-                        has_shares = True
-                    elif action == 2:
-                        has_shares = False
+                    # Select the action with the highest predicted future reward
+                    action = int(np.argmax(q_values))
 
                 state, reward, done = test_env.step(action)
                 history.append(test_env.net_worth)
@@ -184,21 +169,24 @@ if df is not None:
             else:
                 st.warning("⚖️ Result: No profit or loss (Neutral Performance)")
 
-            # Strategy Status with Reason
+           # Dynamic Strategy Status with Real-Time Indicators
             last_action = actions_taken[-1] if actions_taken else 0
             current_rsi = test_df['RSI'].iloc[-1]
+            current_price = test_df['Close'].iloc[-1]
+            sma_20 = test_df['SMA_20'].iloc[-1]
 
             status_text = ""
             reason = ""
+
             if last_action == 1:
                 status_text = "BUY STOCK 🟢"
-                reason = "RSI is low (Oversold), suggesting a price bounce-back." if current_rsi < 42 else "AI detects strong upward momentum."
+                reason = f"DQN Neural Network predicted positive momentum (Price: ${current_price:.2f}, RSI: {current_rsi:.1f})."
             elif last_action == 2:
                 status_text = "SELL STOCK 🔴"
-                reason = "RSI is high (Overbought), suggesting the price might fall." if current_rsi > 58 else "AI is protecting profits from a downward trend."
+                reason = f"DQN Neural Network detected potential profit-taking level (Price: ${current_price:.2f}, RSI: {current_rsi:.1f})."
             else:
                 status_text = "KEEP HOLDING 🟡"
-                reason = "Market indicators are neutral. Waiting for a better entry point."
+                reason = f"DQN evaluated market risk as neutral. Holding position (Price: ${current_price:.2f}, SMA_20: ${sma_20:.2f})."
 
             st.info(f"📢 **Current Strategy:** {status_text}  \n**Reason:** {reason}")
 

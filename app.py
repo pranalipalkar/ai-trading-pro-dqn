@@ -9,26 +9,30 @@ from model import build_dqn_model
 
 st.set_page_config(page_title="AI Trading Pro", layout="wide")
 
-# --- CUSTOM CSS FOR FLOATING CHATBOT (Right Bottom) ---
-st.markdown("""
+# CSS to make the popover button a compact widget pinned to the bottom-right corner
+st.markdown(
+    """
     <style>
+    /* Target the container wrapping the popover button */
     div[data-testid="stPopover"] {
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        z-index: 999999;
+        position: fixed !important;
+        bottom: 30px !important;
+        right: 30px !important;
+        z-index: 999999 !important;
+        width: auto !important;
     }
-    button[data-testid="stBaseButton-secondary"] {
-        background-color: #1E90FF !important;
-        color: white !important;
-        border-radius: 50px !important;
-        padding: 10px 20px !important;
-        box-shadow: 2px 2px 10px rgba(0,0,0,0.2) !important;
-        border: none !important;
-        font-size: 18px !important;
+    
+    /* Ensure the button inside stays compact and styled like a floating badge */
+    div[data-testid="stPopover"] > button {
+        width: auto !important;
+        border-radius: 20px !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+        padding: 8px 16px !important;
     }
     </style>
-    """, unsafe_allow_html=True)
+    """,
+    unsafe_allow_html=True
+)
 
 # --- FLOATING CHATBOT (No Refresh) ---
 with st.popover("💬 Ask AI Assistant"):
@@ -37,19 +41,23 @@ with st.popover("💬 Ask AI Assistant"):
 
     if st.button("What does green arrow indicate?"):
         st.success(
-            "🟢 **BUY:** This means the AI predicts the price will rise soon. It suggests this is a good time to invest.")
+            "🟢 **BUY:** This means the AI predicts the price will rise soon. It suggests this is a good time to invest."
+        )
 
     if st.button("What does red arrow indicate?"):
         st.error(
-            "🔴 **SELL:** This means the AI predicts the price might drop. It suggests selling now to protect your capital or book profits.")
+            "🔴 **SELL:** This means the AI predicts the price might drop. It suggests selling now to protect your capital or book profits."
+        )
 
     if st.button("Why is the AI 'Holding'(yellow)?"):
         st.warning(
-            "🟡 **HOLD:** This means the market trend is currently unclear. The AI is waiting for a better opportunity before making a move.")
+            "🟡 **HOLD:** This means the market trend is currently unclear. The AI is waiting for a better opportunity before making a move."
+        )
 
     if st.button("How can I trust this AI?"):
         st.info(
-            "🛡️ This AI analyzes historical patterns and technical data. If the **'Alpha'** metric is positive, it means the AI is outperforming the general market benchmark.")
+            "🛡️ This AI analyzes historical patterns and technical data. If the **'Alpha'** metric is positive, it means the AI is outperforming the general market benchmark."
+        )
 
 st.title("🚀 Advanced AI Portfolio Optimizer (DQN)")
 

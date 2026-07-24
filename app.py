@@ -119,11 +119,11 @@ if df is not None:
                     state, reward, done = env.step(action)
 
           # 3. Testing (DYNAMIC ADAPTIVE DECISION LOGIC)
-           # 3. Testing (DQN + Dynamic Trend Filter)
             test_env = PortfolioEnv(test_df)
             state = test_env.reset()
             history = []
             actions_taken = []
+            has_shares = False  # Track position internally
 
             for i in range(len(test_df) - 1):
                 state_input = state.reshape(1, 3)
@@ -138,19 +138,25 @@ if df is not None:
 
                 # If Price is above SMA and RSI is healthy -> Strong Uptrend (BUY / HOLD)
                 if current_price > sma_20 and rsi_val > 45:
-                    if test_env.shares == 0:
+                    if not has_shares:
                         action = 1  # BUY if not already holding
+                        has_shares = True
                     else:
-                        action = 0  # KEEP HOLDING to capture benchmark gains
-                # If Price drops below SMA or RSI crashes -> Downtrend (SELL)
+                        action = 0  # KEEP HOLDING to capture gains
+                # If Price drops below SMA or RSI is overbought -> Downtrend (SELL)
                 elif current_price < sma_20 or rsi_val > 70:
-                    if test_env.shares > 0:
+                    if has_shares:
                         action = 2  # SELL to protect profit
+                        has_shares = False
                     else:
                         action = 0  # HOLD CASH
                 else:
-                    # Let the DQN Model decide between actions
+                    # Let the DQN Model decide
                     action = np.argmax(q_vals)
+                    if action == 1:
+                        has_shares = True
+                    elif action == 2:
+                        has_shares = False
 
                 state, reward, done = test_env.step(action)
                 history.append(test_env.net_worth)

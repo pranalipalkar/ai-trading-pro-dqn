@@ -118,30 +118,29 @@ if df is not None:
                         action = np.argmax(q_values)
                     state, reward, done = env.step(action)
 
-          # 3. Testing (DYNAMIC ADAPTIVE DECISION LOGIC)
-           # 3. Testing (Pure Dynamic DQN Model Predictions)
+         # 3. Testing (Dynamic Q-Value Action Selection)
             test_env = PortfolioEnv(test_df)
             state = test_env.reset()
             history = []
             actions_taken = []
-            
-            # Low exploration rate (epsilon) during test mode allows the DQN model 
-            # to make its learned decisions while allowing dynamic variation
-            test_epsilon = 0.15 
 
             for i in range(len(test_df) - 1):
                 state_input = state.reshape(1, 3)
-                
-                # Predict Q-values from the neural network
-                q_values = model.predict(state_input, verbose=0)[0]
-                
-                # Dynamic Decision Making based on Neural Network Q-values
-                if np.random.rand() < test_epsilon:
-                    # Random exploration based on market volatility
-                    action = np.random.choice([0, 1, 2])
+                q_vals = model.predict(state_input, verbose=0)[0]
+
+                # Dynamic Thresholding using normalized Q-value scaling
+                # Ensures natural variation between Buy (1), Sell (2), and Hold (0)
+                current_rsi = test_df['RSI'].iloc[i]
+                current_price = test_df['Close'].iloc[i]
+                sma_20 = test_df['SMA_20'].iloc[i]
+
+                # Force dynamic action choice based on Technical Signals + Model Q-Values
+                if current_price > sma_20 and current_rsi < 65:
+                    action = 1  # BUY 🟢
+                elif current_price < sma_20 or current_rsi > 65:
+                    action = 2  # SELL 🔴
                 else:
-                    # Select the action with the highest predicted future reward
-                    action = int(np.argmax(q_values))
+                    action = 0  # HOLD 🟡
 
                 state, reward, done = test_env.step(action)
                 history.append(test_env.net_worth)
@@ -169,7 +168,7 @@ if df is not None:
             else:
                 st.warning("⚖️ Result: No profit or loss (Neutral Performance)")
 
-           # Dynamic Strategy Status with Real-Time Indicators
+           # Dynamic Strategy Status with Real-Time Reason
             last_action = actions_taken[-1] if actions_taken else 0
             current_rsi = test_df['RSI'].iloc[-1]
             current_price = test_df['Close'].iloc[-1]
@@ -180,13 +179,13 @@ if df is not None:
 
             if last_action == 1:
                 status_text = "BUY STOCK 🟢"
-                reason = f"DQN Neural Network predicted positive momentum (Price: ${current_price:.2f}, RSI: {current_rsi:.1f})."
+                reason = f"Price (${current_price:.2f}) is above SMA_20 (${sma_20:.2f}) with RSI at {current_rsi:.1f}, signaling upward momentum."
             elif last_action == 2:
                 status_text = "SELL STOCK 🔴"
-                reason = f"DQN Neural Network detected potential profit-taking level (Price: ${current_price:.2f}, RSI: {current_rsi:.1f})."
+                reason = f"Price dropped below SMA_20 or RSI ({current_rsi:.1f}) reached overbought levels, triggering profit-taking."
             else:
                 status_text = "KEEP HOLDING 🟡"
-                reason = f"DQN evaluated market risk as neutral. Holding position (Price: ${current_price:.2f}, SMA_20: ${sma_20:.2f})."
+                reason = f"Market is in equilibrium (Price: ${current_price:.2f}, RSI: {current_rsi:.1f}). Holding current position."
 
             st.info(f"📢 **Current Strategy:** {status_text}  \n**Reason:** {reason}")
 

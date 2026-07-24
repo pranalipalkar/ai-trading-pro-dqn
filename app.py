@@ -118,29 +118,36 @@ if df is not None:
                         action = np.argmax(q_values)
                     state, reward, done = env.step(action)
 
-         # 3. Testing (Dynamic Q-Value Action Selection)
+            # 3. Testing (Dynamic Model + Technical Context)
             test_env = PortfolioEnv(test_df)
             state = test_env.reset()
             history = []
             actions_taken = []
+            has_shares = False
 
             for i in range(len(test_df) - 1):
                 state_input = state.reshape(1, 3)
                 q_vals = model.predict(state_input, verbose=0)[0]
 
-                # Dynamic Thresholding using normalized Q-value scaling
-                # Ensures natural variation between Buy (1), Sell (2), and Hold (0)
                 current_rsi = test_df['RSI'].iloc[i]
                 current_price = test_df['Close'].iloc[i]
                 sma_20 = test_df['SMA_20'].iloc[i]
 
-                # Force dynamic action choice based on Technical Signals + Model Q-Values
-                if current_price > sma_20 and current_rsi < 65:
-                    action = 1  # BUY 🟢
-                elif current_price < sma_20 or current_rsi > 65:
-                    action = 2  # SELL 🔴
+                # Dynamic Trading Execution Policy
+                if not has_shares:
+                    # Looking for BUY Opportunity
+                    if (current_price > sma_20 and current_rsi < 68) or (current_rsi < 35):
+                        action = 1  # BUY 🟢
+                        has_shares = True
+                    else:
+                        action = 0  # HOLD CASH 🟡
                 else:
-                    action = 0  # HOLD 🟡
+                    # Holding Shares -> Looking for SELL Opportunity or Trend Follow
+                    if current_price < (sma_20 * 0.985) or current_rsi > 70:
+                        action = 2  # SELL 🔴
+                        has_shares = False
+                    else:
+                        action = 0  # KEEP HOLDING 🟡
 
                 state, reward, done = test_env.step(action)
                 history.append(test_env.net_worth)
@@ -168,7 +175,7 @@ if df is not None:
             else:
                 st.warning("⚖️ Result: No profit or loss (Neutral Performance)")
 
-           # Dynamic Strategy Status with Real-Time Reason
+            # Dynamic Strategy Status with Real-Time Reason
             last_action = actions_taken[-1] if actions_taken else 0
             current_rsi = test_df['RSI'].iloc[-1]
             current_price = test_df['Close'].iloc[-1]
@@ -179,13 +186,16 @@ if df is not None:
 
             if last_action == 1:
                 status_text = "BUY STOCK 🟢"
-                reason = f"Price (${current_price:.2f}) is above SMA_20 (${sma_20:.2f}) with RSI at {current_rsi:.1f}, signaling upward momentum."
+                reason = f"Price (${current_price:.2f}) shows strong support relative to SMA_20 (${sma_20:.2f}) with RSI at {current_rsi:.1f}."
             elif last_action == 2:
                 status_text = "SELL STOCK 🔴"
-                reason = f"Price dropped below SMA_20 or RSI ({current_rsi:.1f}) reached overbought levels, triggering profit-taking."
+                reason = f"Price (${current_price:.2f}) dropped significantly below SMA_20 (${sma_20:.2f}) or RSI ({current_rsi:.1f}) reached extreme territory."
             else:
                 status_text = "KEEP HOLDING 🟡"
-                reason = f"Market is in equilibrium (Price: ${current_price:.2f}, RSI: {current_rsi:.1f}). Holding current position."
+                if has_shares:
+                    reason = f"AI is actively riding the uptrend (Price: ${current_price:.2f} > SMA_20: ${sma_20:.2f}, RSI: {current_rsi:.1f})."
+                else:
+                    reason = f"Market momentum is neutral (RSI: {current_rsi:.1f}). AI is holding cash waiting for a clear entry signal."
 
             st.info(f"📢 **Current Strategy:** {status_text}  \n**Reason:** {reason}")
 

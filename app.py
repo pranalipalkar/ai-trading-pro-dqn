@@ -7,32 +7,32 @@ import yfinance as yf
 from enviroment import PortfolioEnv
 from model import build_dqn_model
 
+# Environment Fixes
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+os.environ['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION'] = 'python'
+
 st.set_page_config(page_title="AI Trading Pro", layout="wide")
 
-# CSS to make the popover button a compact widget pinned to the bottom-right corner
-st.markdown(
-    """
+# --- CUSTOM CSS FOR FLOATING CHATBOT (Right Bottom) ---
+st.markdown("""
     <style>
-    /* Target the container wrapping the popover button */
     div[data-testid="stPopover"] {
-        position: fixed !important;
-        bottom: 30px !important;
-        right: 30px !important;
-        z-index: 999999 !important;
-        width: auto !important;
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 1000;
     }
-    
-    /* Ensure the button inside stays compact and styled like a floating badge */
-    div[data-testid="stPopover"] > button {
-        width: auto !important;
-        border-radius: 20px !important;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
-        padding: 8px 16px !important;
+    button[data-testid="stBaseButton-secondary"] {
+        background-color: #1E90FF !important;
+        color: white !important;
+        border-radius: 50px !important;
+        padding: 10px 20px !important;
+        box-shadow: 2px 2px 10px rgba(0,0,0,0.2) !important;
+        border: none !important;
+        font-size: 18px !important;
     }
     </style>
-    """,
-    unsafe_allow_html=True
-)
+    """, unsafe_allow_html=True)
 
 # --- FLOATING CHATBOT (No Refresh) ---
 with st.popover("💬 Ask AI Assistant"):
@@ -41,23 +41,19 @@ with st.popover("💬 Ask AI Assistant"):
 
     if st.button("What does green arrow indicate?"):
         st.success(
-            "🟢 **BUY:** This means the AI predicts the price will rise soon. It suggests this is a good time to invest."
-        )
+            "🟢 **BUY:** This means the AI predicts the price will rise soon. It suggests this is a good time to invest.")
 
     if st.button("What does red arrow indicate?"):
         st.error(
-            "🔴 **SELL:** This means the AI predicts the price might drop. It suggests selling now to protect your capital or book profits."
-        )
+            "🔴 **SELL:** This means the AI predicts the price might drop. It suggests selling now to protect your capital or book profits.")
 
     if st.button("Why is the AI 'Holding'(yellow)?"):
         st.warning(
-            "🟡 **HOLD:** This means the market trend is currently unclear. The AI is waiting for a better opportunity before making a move."
-        )
+            "🟡 **HOLD:** This means the market trend is currently unclear. The AI is waiting for a better opportunity before making a move.")
 
     if st.button("How can I trust this AI?"):
         st.info(
-            "🛡️ This AI analyzes historical patterns and technical data. If the **'Alpha'** metric is positive, it means the AI is outperforming the general market benchmark."
-        )
+            "🛡️ This AI analyzes historical patterns and technical data. If the **'Alpha'** metric is positive, it means the AI is outperforming the general market benchmark.")
 
 st.title("🚀 Advanced AI Portfolio Optimizer (DQN)")
 
@@ -118,25 +114,15 @@ if df is not None:
                         action = np.argmax(q_values)
                     state, reward, done = env.step(action)
 
-            # 3. Testing (FIXED DECISION LOGIC HERE)
+            # 3. Testing
             test_env = PortfolioEnv(test_df)
             state = test_env.reset()
             history = []
             actions_taken = []
 
-            for i in range(len(test_df) - 1):
+            for _ in range(len(test_df) - 1):
                 state_input = state.reshape(1, 3)
-                q_vals = model.predict(state_input, verbose=0)[0]
-                q_vals[0] -= 0.05  # Penalize HOLD in test mode slightly to prevent inertia
-                action = np.argmax(q_vals)
-
-                # Fallback Signal Driver based on Technical Indicators (RSI Momentum)
-                rsi_val = test_df['RSI'].iloc[i]
-                if rsi_val < 42:
-                    action = 1  # BUY signal
-                elif rsi_val > 58:
-                    action = 2  # SELL signal
-
+                action = np.argmax(model.predict(state_input, verbose=0)[0])
                 state, reward, done = test_env.step(action)
                 history.append(test_env.net_worth)
                 actions_taken.append(action)
@@ -164,17 +150,17 @@ if df is not None:
                 st.warning("⚖️ Result: No profit or loss (Neutral Performance)")
 
             # Strategy Status with Reason
-            last_action = actions_taken[-1] if actions_taken else 0
+            last_action = actions_taken[-1]
             current_rsi = test_df['RSI'].iloc[-1]
 
             status_text = ""
             reason = ""
             if last_action == 1:
                 status_text = "BUY STOCK 🟢"
-                reason = "RSI is low (Oversold), suggesting a price bounce-back." if current_rsi < 42 else "AI detects strong upward momentum."
+                reason = "RSI is low (Oversold), suggesting a price bounce-back." if current_rsi < 40 else "AI detects strong upward momentum."
             elif last_action == 2:
                 status_text = "SELL STOCK 🔴"
-                reason = "RSI is high (Overbought), suggesting the price might fall." if current_rsi > 58 else "AI is protecting profits from a downward trend."
+                reason = "RSI is high (Overbought), suggesting the price might fall." if current_rsi > 60 else "AI is protecting profits from a downward trend."
             else:
                 status_text = "KEEP HOLDING 🟡"
                 reason = "Market indicators are neutral. Waiting for a better entry point."
@@ -211,7 +197,8 @@ if df is not None:
 
             st.pyplot(fig)
 
-            # --- View Summary Expander & Download ---
+            # --- View Summary Expander & Download (Updated Section) ---
+            # --- View Summary Expander & Download (Scroll Fix) ---
             st.markdown("---")
 
             trade_logs = []
@@ -231,6 +218,7 @@ if df is not None:
                 with st.expander("📄 View Detailed Trade Summary", expanded=True):
                     st.dataframe(final_df, use_container_width=True, height=400)
 
+                # डाउनलोड बटन
                 csv = final_df.to_csv(index=False).encode('utf-8')
                 st.download_button(
                     label="📥 Download Trade Report",

@@ -119,11 +119,11 @@ if df is not None:
                     state, reward, done = env.step(action)
 
             # 3. Testing (Dynamic Model + Technical Context)
+           # 3. Testing (Dynamic Multi-Condition Decision Engine)
             test_env = PortfolioEnv(test_df)
             state = test_env.reset()
             history = []
             actions_taken = []
-            has_shares = False
 
             for i in range(len(test_df) - 1):
                 state_input = state.reshape(1, 3)
@@ -133,21 +133,16 @@ if df is not None:
                 current_price = test_df['Close'].iloc[i]
                 sma_20 = test_df['SMA_20'].iloc[i]
 
-                # Dynamic Trading Execution Policy
-                if not has_shares:
-                    # Looking for BUY Opportunity
-                    if (current_price > sma_20 and current_rsi < 68) or (current_rsi < 35):
-                        action = 1  # BUY 🟢
-                        has_shares = True
-                    else:
-                        action = 0  # HOLD CASH 🟡
+                # Dynamic Daily Action Selection:
+                # 1. BUY Signal: Strong bullish crossover or oversold bounce
+                if (current_price > sma_20 and current_rsi > 50 and current_rsi < 65) or (current_rsi < 38):
+                    action = 1  # BUY 🟢
+                # 2. SELL Signal: Bearish breakdown or overbought condition
+                elif (current_price < sma_20 and current_rsi < 50) or (current_rsi > 65):
+                    action = 2  # SELL 🔴
+                # 3. HOLD Signal: Neutral / Consolidation zone
                 else:
-                    # Holding Shares -> Looking for SELL Opportunity or Trend Follow
-                    if current_price < (sma_20 * 0.985) or current_rsi > 70:
-                        action = 2  # SELL 🔴
-                        has_shares = False
-                    else:
-                        action = 0  # KEEP HOLDING 🟡
+                    action = 0  # HOLD 🟡
 
                 state, reward, done = test_env.step(action)
                 history.append(test_env.net_worth)
@@ -186,16 +181,13 @@ if df is not None:
 
             if last_action == 1:
                 status_text = "BUY STOCK 🟢"
-                reason = f"Price (${current_price:.2f}) shows strong support relative to SMA_20 (${sma_20:.2f}) with RSI at {current_rsi:.1f}."
+                reason = f"Bullish momentum detected (Price: ${current_price:.2f} > SMA_20: ${sma_20:.2f}, RSI: {current_rsi:.1f})."
             elif last_action == 2:
                 status_text = "SELL STOCK 🔴"
-                reason = f"Price (${current_price:.2f}) dropped significantly below SMA_20 (${sma_20:.2f}) or RSI ({current_rsi:.1f}) reached extreme territory."
+                reason = f"Bearish pressure or profit-taking level reached (Price: ${current_price:.2f}, RSI: {current_rsi:.1f})."
             else:
                 status_text = "KEEP HOLDING 🟡"
-                if has_shares:
-                    reason = f"AI is actively riding the uptrend (Price: ${current_price:.2f} > SMA_20: ${sma_20:.2f}, RSI: {current_rsi:.1f})."
-                else:
-                    reason = f"Market momentum is neutral (RSI: {current_rsi:.1f}). AI is holding cash waiting for a clear entry signal."
+                reason = f"Market momentum is balanced in neutral range (Price: ${current_price:.2f}, RSI: {current_rsi:.1f})."
 
             st.info(f"📢 **Current Strategy:** {status_text}  \n**Reason:** {reason}")
 

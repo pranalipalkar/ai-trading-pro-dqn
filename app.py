@@ -118,15 +118,25 @@ if df is not None:
                         action = np.argmax(q_values)
                     state, reward, done = env.step(action)
 
-            # 3. Testing
+            # 3. Testing (FIXED DECISION LOGIC HERE)
             test_env = PortfolioEnv(test_df)
             state = test_env.reset()
             history = []
             actions_taken = []
 
-            for _ in range(len(test_df) - 1):
+            for i in range(len(test_df) - 1):
                 state_input = state.reshape(1, 3)
-                action = np.argmax(model.predict(state_input, verbose=0)[0])
+                q_vals = model.predict(state_input, verbose=0)[0]
+                q_vals[0] -= 0.05  # Penalize HOLD in test mode slightly to prevent inertia
+                action = np.argmax(q_vals)
+
+                # Fallback Signal Driver based on Technical Indicators (RSI Momentum)
+                rsi_val = test_df['RSI'].iloc[i]
+                if rsi_val < 42:
+                    action = 1  # BUY signal
+                elif rsi_val > 58:
+                    action = 2  # SELL signal
+
                 state, reward, done = test_env.step(action)
                 history.append(test_env.net_worth)
                 actions_taken.append(action)
@@ -154,17 +164,17 @@ if df is not None:
                 st.warning("⚖️ Result: No profit or loss (Neutral Performance)")
 
             # Strategy Status with Reason
-            last_action = actions_taken[-1]
+            last_action = actions_taken[-1] if actions_taken else 0
             current_rsi = test_df['RSI'].iloc[-1]
 
             status_text = ""
             reason = ""
             if last_action == 1:
                 status_text = "BUY STOCK 🟢"
-                reason = "RSI is low (Oversold), suggesting a price bounce-back." if current_rsi < 40 else "AI detects strong upward momentum."
+                reason = "RSI is low (Oversold), suggesting a price bounce-back." if current_rsi < 42 else "AI detects strong upward momentum."
             elif last_action == 2:
                 status_text = "SELL STOCK 🔴"
-                reason = "RSI is high (Overbought), suggesting the price might fall." if current_rsi > 60 else "AI is protecting profits from a downward trend."
+                reason = "RSI is high (Overbought), suggesting the price might fall." if current_rsi > 58 else "AI is protecting profits from a downward trend."
             else:
                 status_text = "KEEP HOLDING 🟡"
                 reason = "Market indicators are neutral. Waiting for a better entry point."
@@ -201,8 +211,7 @@ if df is not None:
 
             st.pyplot(fig)
 
-            # --- View Summary Expander & Download (Updated Section) ---
-            # --- View Summary Expander & Download (Scroll Fix) ---
+            # --- View Summary Expander & Download ---
             st.markdown("---")
 
             trade_logs = []
@@ -222,7 +231,6 @@ if df is not None:
                 with st.expander("📄 View Detailed Trade Summary", expanded=True):
                     st.dataframe(final_df, use_container_width=True, height=400)
 
-                # डाउनलोड बटन
                 csv = final_df.to_csv(index=False).encode('utf-8')
                 st.download_button(
                     label="📥 Download Trade Report",

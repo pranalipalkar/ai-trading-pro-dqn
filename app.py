@@ -119,33 +119,38 @@ if df is not None:
                     state, reward, done = env.step(action)
 
           # 3. Testing (DYNAMIC ADAPTIVE DECISION LOGIC)
+           # 3. Testing (DQN + Dynamic Trend Filter)
             test_env = PortfolioEnv(test_df)
             state = test_env.reset()
             history = []
             actions_taken = []
 
-            # Calculate rolling mean RSI to create dynamic bounds
-            rsi_mean = test_df['RSI'].rolling(window=20, min_periods=1).mean()
-            rsi_std = test_df['RSI'].rolling(window=20, min_periods=1).std().fillna(1)
-
             for i in range(len(test_df) - 1):
                 state_input = state.reshape(1, 3)
+                
+                # Get raw DQN output predictions
                 q_vals = model.predict(state_input, verbose=0)[0]
                 
+                # Dynamic Momentum Check (Close Price vs SMA_20)
+                current_price = test_df['Close'].iloc[i]
+                sma_20 = test_df['SMA_20'].iloc[i]
                 rsi_val = test_df['RSI'].iloc[i]
-                avg_rsi = rsi_mean.iloc[i]
-                std_rsi = rsi_std.iloc[i]
 
-                # Adaptive Thresholds based on recent momentum
-                upper_bound = avg_rsi + (0.5 * std_rsi)
-                lower_bound = avg_rsi - (0.5 * std_rsi)
-
-                if rsi_val < lower_bound:
-                    action = 1  # BUY (Relatively Oversold)
-                elif rsi_val > upper_bound:
-                    action = 2  # SELL (Relatively Overbought)
+                # If Price is above SMA and RSI is healthy -> Strong Uptrend (BUY / HOLD)
+                if current_price > sma_20 and rsi_val > 45:
+                    if test_env.shares == 0:
+                        action = 1  # BUY if not already holding
+                    else:
+                        action = 0  # KEEP HOLDING to capture benchmark gains
+                # If Price drops below SMA or RSI crashes -> Downtrend (SELL)
+                elif current_price < sma_20 or rsi_val > 70:
+                    if test_env.shares > 0:
+                        action = 2  # SELL to protect profit
+                    else:
+                        action = 0  # HOLD CASH
                 else:
-                    action = 0  # HOLD
+                    # Let the DQN Model decide between actions
+                    action = np.argmax(q_vals)
 
                 state, reward, done = test_env.step(action)
                 history.append(test_env.net_worth)
